@@ -1,36 +1,44 @@
-# [Project name]
+# Casino Discord Bot
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Bot Discord casino complet — économie, mini-jeux solo & 1v1, boutique interactive, déployable sur Render.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `cd bot && npm run dev` — lance le bot en mode développement (hot-reload)
+- `cd bot && npm run build` — compile TypeScript → dist/
+- `cd bot && npm run deploy` — (ré)enregistre les 20 slash commands auprès de Discord
+- `cd bot && npm start` — lance le bot compilé (production)
+
+## Variables d'environnement requises
+
+- `DISCORD_TOKEN` — token du bot (onglet Bot du portail Discord)
+- `CLIENT_ID` — Application ID (General Information)
+- `GUILD_ID` — *(optionnel)* pour déploiement instantané des commandes sur un serveur
+- `DB_PATH` — *(optionnel)* chemin vers le fichier SQLite (défaut: `bot/data/casino.db`)
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **discord.js** v14 — slash commands, boutons interactifs, embeds
+- **node:sqlite** — SQLite natif Node.js 24 (pas de compilation C++ requise)
+- **TypeScript** 5.7 — typage complet
+- **tsx** — hot-reload en développement
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `bot/src/index.ts` — point d'entrée, initialisation client Discord
+- `bot/src/database/index.ts` — toutes les opérations SQLite (source of truth)
+- `bot/src/commands/` — toutes les commandes slash organisées par dossier
+- `bot/src/utils/` — helpers (économie, couleurs, shop message)
+- `bot/scripts/deploy-commands.ts` — script d'enregistrement des commandes
+- `render.yaml` — config déploiement Render (root du projet)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
-
-## Product
-
-_Describe the high-level user-facing capabilities of this app once they exist._
+- `node:sqlite` (Node.js 24 natif) à la place de `better-sqlite3` → zéro compilation native, compatible Render et Replit
+- Client Discord exposé via singleton `src/client.ts` pour éviter les dépendances circulaires
+- État des parties Blackjack en mémoire (Map) — pas besoin de persistance pour une partie < 5 min
+- Duels (1v1) persistés en SQLite avec nettoyage auto toutes les 60s
+- Message boutique persistant dans un salon Discord, mis à jour automatiquement à chaque changement d'article
 
 ## User preferences
 
@@ -38,8 +46,6 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Après chaque changement de commande slash, relancer `npm run deploy`
+- Les commandes globales Discord prennent jusqu'à 1h à apparaître — définir `GUILD_ID` pour test instantané
+- Sur Render : disque persistant monté sur `/var/data`, DB_PATH=/var/data/casino.db
