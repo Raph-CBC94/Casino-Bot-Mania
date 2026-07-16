@@ -5,19 +5,15 @@ import { formatBalance, randomInt } from '../../utils/economy.js';
 
 const RED_NUMBERS = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 
-interface BetType {
-  label: string;
-  multiplier: number;
-  check: (n: number) => boolean;
-}
+interface BetType { label: string; multiplier: number; check: (n: number) => boolean }
 
 const BET_TYPES: Record<string, BetType> = {
-  rouge:      { label: '🔴 Rouge',        multiplier: 2, check: n => n > 0 && RED_NUMBERS.has(n) },
-  noir:       { label: '⚫ Noir',          multiplier: 2, check: n => n > 0 && !RED_NUMBERS.has(n) },
-  pair:       { label: '2️⃣ Pair',         multiplier: 2, check: n => n > 0 && n % 2 === 0 },
-  impair:     { label: '1️⃣ Impair',       multiplier: 2, check: n => n % 2 === 1 },
-  manque:     { label: '📉 Manque (1-18)', multiplier: 2, check: n => n >= 1 && n <= 18 },
-  passe:      { label: '📈 Passe (19-36)', multiplier: 2, check: n => n >= 19 && n <= 36 },
+  rouge:      { label: '🔴 Rouge',              multiplier: 2,  check: n => n > 0 && RED_NUMBERS.has(n) },
+  noir:       { label: '⚫ Noir',               multiplier: 2,  check: n => n > 0 && !RED_NUMBERS.has(n) },
+  pair:       { label: '2️⃣ Pair',              multiplier: 2,  check: n => n > 0 && n % 2 === 0 },
+  impair:     { label: '1️⃣ Impair',            multiplier: 2,  check: n => n % 2 === 1 },
+  manque:     { label: '📉 Manque (1-18)',       multiplier: 2,  check: n => n >= 1 && n <= 18 },
+  passe:      { label: '📈 Passe (19-36)',       multiplier: 2,  check: n => n >= 19 && n <= 36 },
   douzaine_1: { label: '🔢 1ère douzaine (1-12)',  multiplier: 3, check: n => n >= 1 && n <= 12 },
   douzaine_2: { label: '🔢 2ème douzaine (13-24)', multiplier: 3, check: n => n >= 13 && n <= 24 },
   douzaine_3: { label: '🔢 3ème douzaine (25-36)', multiplier: 3, check: n => n >= 25 && n <= 36 },
@@ -47,7 +43,7 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     const bet = interaction.options.getInteger('mise', true);
     const type = interaction.options.getString('type', true);
-    const user = getUser(interaction.user.id, interaction.guildId!);
+    const user = await getUser(interaction.user.id, interaction.guildId!);
 
     if (user.balance < bet) {
       return interaction.reply({
@@ -80,8 +76,10 @@ export default {
     }
 
     const gain = won ? Math.floor(bet * multiplier) - bet : -bet;
-    addBalance(interaction.user.id, interaction.guildId!, gain);
-    won ? addWin(interaction.user.id, interaction.guildId!) : addLoss(interaction.user.id, interaction.guildId!);
+    await addBalance(interaction.user.id, interaction.guildId!, gain);
+    won
+      ? await addWin(interaction.user.id, interaction.guildId!)
+      : await addLoss(interaction.user.id, interaction.guildId!);
 
     const embed = new EmbedBuilder()
       .setColor(result === 0 ? Colors.green : isRed ? Colors.red : Colors.dark)

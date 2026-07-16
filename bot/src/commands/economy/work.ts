@@ -1,5 +1,5 @@
 import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
-import { db, getUser } from '../../database/index.js';
+import { getUser, addBalance, setWorkLast } from '../../database/index.js';
 import { Colors } from '../../utils/colors.js';
 import { WORK_COOLDOWN, WORK_MIN, WORK_MAX, formatBalance, randomInt } from '../../utils/economy.js';
 
@@ -20,7 +20,7 @@ export default {
     .setDescription('Travaille pour gagner des pièces 💼 (cooldown 1h)'),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const user = getUser(interaction.user.id, interaction.guildId!);
+    const user = await getUser(interaction.user.id, interaction.guildId!);
     const now = Math.floor(Date.now() / 1000);
     const elapsed = now - user.work_last;
     const remaining = WORK_COOLDOWN - elapsed;
@@ -38,8 +38,8 @@ export default {
 
     const earned = randomInt(WORK_MIN, WORK_MAX);
     const job = JOBS[Math.floor(Math.random() * JOBS.length)];
-    db.prepare('UPDATE users SET balance = balance + ?, work_last = ? WHERE user_id = ? AND guild_id = ?')
-      .run(earned, now, interaction.user.id, interaction.guildId!);
+    await addBalance(interaction.user.id, interaction.guildId!, earned);
+    await setWorkLast(interaction.user.id, interaction.guildId!, now);
 
     const embed = new EmbedBuilder()
       .setColor(Colors.teal)

@@ -25,9 +25,7 @@ export default {
     const role = interaction.options.getRole('role');
     const emoji = interaction.options.getString('emoji') ?? '🎁';
 
-    const result = addShopItem(interaction.guildId!, name, desc, price, role?.id ?? null, emoji);
-    const itemId = Number((result as { lastInsertRowid: bigint | number }).lastInsertRowid);
-
+    const itemId = await addShopItem(interaction.guildId!, name, desc, price, role?.id ?? null, emoji);
     await refreshShopMessage(interaction.guildId!);
 
     const embed = new EmbedBuilder()

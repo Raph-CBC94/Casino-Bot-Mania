@@ -15,7 +15,7 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     const bet = interaction.options.getInteger('mise', true);
     const choix = interaction.options.getString('choix', true);
-    const user = getUser(interaction.user.id, interaction.guildId!);
+    const user = await getUser(interaction.user.id, interaction.guildId!);
 
     if (user.balance < bet) {
       return interaction.reply({
@@ -27,8 +27,10 @@ export default {
     const result = Math.random() < 0.5 ? 'pile' : 'face';
     const won = result === choix;
 
-    addBalance(interaction.user.id, interaction.guildId!, won ? bet : -bet);
-    won ? addWin(interaction.user.id, interaction.guildId!) : addLoss(interaction.user.id, interaction.guildId!);
+    await addBalance(interaction.user.id, interaction.guildId!, won ? bet : -bet);
+    won
+      ? await addWin(interaction.user.id, interaction.guildId!)
+      : await addLoss(interaction.user.id, interaction.guildId!);
 
     const embed = new EmbedBuilder()
       .setColor(won ? Colors.green : Colors.red)

@@ -24,13 +24,13 @@ export default {
     if (target.bot || target.id === interaction.user.id)
       return interaction.reply({ content: '❌ Adversaire invalide.', ephemeral: true });
 
-    const challenger = getUser(interaction.user.id, interaction.guildId!);
+    const challenger = await getUser(interaction.user.id, interaction.guildId!);
     if (challenger.balance < bet)
       return interaction.reply({ content: `❌ Solde insuffisant ! Tu as ${formatBalance(challenger.balance)}.`, ephemeral: true });
 
     const duelId = generateDuelId();
-    addBalance(interaction.user.id, interaction.guildId!, -bet);
-    createDuel(duelId, interaction.user.id, target.id, interaction.guildId!, interaction.channelId, 'dice', bet);
+    await addBalance(interaction.user.id, interaction.guildId!, -bet);
+    await createDuel(duelId, interaction.user.id, target.id, interaction.guildId!, interaction.channelId, 'dice', bet);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId(`duel_dice:accept:${duelId}`).setLabel('✅ Accepter').setStyle(ButtonStyle.Success),
@@ -49,7 +49,7 @@ export default {
 
   async handleButton(interaction: ButtonInteraction) {
     const [, action, duelId] = interaction.customId.split(':');
-    const duel = getDuel(duelId);
+    const duel = await getDuel(duelId);
 
     if (!duel) return interaction.reply({ content: '⌛ Ce duel a expiré.', ephemeral: true });
     if (interaction.user.id !== duel.challenged_id)
@@ -60,8 +60,8 @@ export default {
     await interaction.deferUpdate();
 
     if (action === 'decline') {
-      addBalance(duel.challenger_id, duel.guild_id, duel.bet);
-      deleteDuel(duelId);
+      await addBalance(duel.challenger_id, duel.guild_id, duel.bet);
+      await deleteDuel(duelId);
       return interaction.editReply({
         embeds: [new EmbedBuilder().setColor(Colors.red).setTitle('🎲 Duel Dés — Refusé')
           .setDescription(`<@${duel.challenged_id}> a refusé le duel. Mise remboursée.`)],
@@ -69,18 +69,18 @@ export default {
       });
     }
 
-    const challenged = getUser(duel.challenged_id, duel.guild_id);
+    const challenged = await getUser(duel.challenged_id, duel.guild_id);
     if (challenged.balance < duel.bet) {
-      addBalance(duel.challenger_id, duel.guild_id, duel.bet);
-      deleteDuel(duelId);
+      await addBalance(duel.challenger_id, duel.guild_id, duel.bet);
+      await deleteDuel(duelId);
       return interaction.editReply({
         embeds: [new EmbedBuilder().setColor(Colors.red).setDescription(`❌ <@${duel.challenged_id}> n'a pas assez de pièces !`)],
         components: [],
       });
     }
 
-    addBalance(duel.challenged_id, duel.guild_id, -duel.bet);
-    deleteDuel(duelId);
+    await addBalance(duel.challenged_id, duel.guild_id, -duel.bet);
+    await deleteDuel(duelId);
 
     const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
     let cRoll = randomInt(1, 6);
@@ -89,22 +89,20 @@ export default {
     while (cRoll === dRoll && rerolls < 5) { cRoll = randomInt(1, 6); dRoll = randomInt(1, 6); rerolls++; }
 
     const tie = cRoll === dRoll;
-    let winnerId: string, loserId: string;
-    if (tie) {
-      winnerId = ''; loserId = '';
-    } else if (cRoll > dRoll) {
-      winnerId = duel.challenger_id; loserId = duel.challenged_id;
-    } else {
-      winnerId = duel.challenged_id; loserId = duel.challenger_id;
+    let winnerId = '';
+    let loserId = '';
+    if (!tie) {
+      if (cRoll > dRoll) { winnerId = duel.challenger_id; loserId = duel.challenged_id; }
+      else               { winnerId = duel.challenged_id; loserId = duel.challenger_id; }
     }
 
     if (!tie) {
-      addBalance(winnerId, duel.guild_id, duel.bet * 2);
-      addWin(winnerId, duel.guild_id);
-      addLoss(loserId, duel.guild_id);
+      await addBalance(winnerId, duel.guild_id, duel.bet * 2);
+      await addWin(winnerId, duel.guild_id);
+      await addLoss(loserId, duel.guild_id);
     } else {
-      addBalance(duel.challenger_id, duel.guild_id, duel.bet);
-      addBalance(duel.challenged_id, duel.guild_id, duel.bet);
+      await addBalance(duel.challenger_id, duel.guild_id, duel.bet);
+      await addBalance(duel.challenged_id, duel.guild_id, duel.bet);
     }
 
     const embed = new EmbedBuilder()

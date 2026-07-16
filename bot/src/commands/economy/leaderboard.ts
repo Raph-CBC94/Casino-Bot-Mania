@@ -10,7 +10,7 @@ export default {
     .setDescription('Top 10 des joueurs les plus riches 👑'),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const rows = getLeaderboard(interaction.guildId!);
+    const rows = await getLeaderboard(interaction.guildId!);
     if (!rows.length) {
       return interaction.reply({ content: 'Aucun joueur enregistré sur ce serveur.', ephemeral: true });
     }

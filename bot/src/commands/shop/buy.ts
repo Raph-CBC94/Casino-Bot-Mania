@@ -12,12 +12,12 @@ async function buyItem(
   itemId: number,
   interaction: ChatInputCommandInteraction | ButtonInteraction,
 ) {
-  const item = getShopItem(itemId, guildId);
+  const item = await getShopItem(itemId, guildId);
   if (!item) {
     return interaction.reply({ content: '❌ Article introuvable.', ephemeral: true });
   }
 
-  const user = getUser(userId, guildId);
+  const user = await getUser(userId, guildId);
   if (user.balance < item.price) {
     return interaction.reply({
       content: `❌ Solde insuffisant ! Tu as ${formatBalance(user.balance)} mais cet article coûte ${formatBalance(item.price)}.`,
@@ -25,10 +25,10 @@ async function buyItem(
     });
   }
 
-  addBalance(userId, guildId, -item.price);
-  addUserItem(userId, guildId, itemId);
+  await addBalance(userId, guildId, -item.price);
+  await addUserItem(userId, guildId, itemId);
 
-  // Assign role if any
+  // Attribuer le rôle si configuré
   if (item.role_id && interaction.guild) {
     try {
       const member = await interaction.guild.members.fetch(userId);

@@ -9,7 +9,7 @@ export default {
     .setDescription('🎒 Affiche ton inventaire'),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const items = getUserItems(interaction.user.id, interaction.guildId!);
+    const items = await getUserItems(interaction.user.id, interaction.guildId!);
 
     const embed = new EmbedBuilder()
       .setColor(Colors.purple)

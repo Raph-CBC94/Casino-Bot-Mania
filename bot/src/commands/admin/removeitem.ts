@@ -15,13 +15,13 @@ export default {
 
   async execute(interaction: ChatInputCommandInteraction) {
     const itemId = interaction.options.getInteger('id', true);
-    const item = getShopItem(itemId, interaction.guildId!);
+    const item = await getShopItem(itemId, interaction.guildId!);
 
     if (!item) {
       return interaction.reply({ content: `❌ Aucun article avec l'ID \`${itemId}\` sur ce serveur.`, ephemeral: true });
     }
 
-    removeShopItem(itemId, interaction.guildId!);
+    await removeShopItem(itemId, interaction.guildId!);
     await refreshShopMessage(interaction.guildId!);
 
     const embed = new EmbedBuilder()

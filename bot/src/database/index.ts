@@ -1,170 +1,140 @@
-// Using Node.js 24 built-in SQLite (no native compilation required)
-import { DatabaseSync } from 'node:sqlite';
-import path from 'node:path';
-import fs from 'node:fs';
+import { createClient } from '@supabase/supabase-js';
 
-const dbDir = process.env.DB_PATH ? path.dirname(process.env.DB_PATH) : path.join(process.cwd(), 'data');
-if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-const dbPath = process.env.DB_PATH || path.join(dbDir, 'casino.db');
-export const db = new DatabaseSync(dbPath);
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('❌  SUPABASE_URL et SUPABASE_SERVICE_KEY sont requis');
+}
 
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    user_id    TEXT NOT NULL,
-    guild_id   TEXT NOT NULL,
-    balance    INTEGER DEFAULT 1000,
-    daily_last INTEGER DEFAULT 0,
-    work_last  INTEGER DEFAULT 0,
-    wins       INTEGER DEFAULT 0,
-    losses     INTEGER DEFAULT 0,
-    PRIMARY KEY (user_id, guild_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS shop_items (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    guild_id    TEXT NOT NULL,
-    name        TEXT NOT NULL,
-    description TEXT DEFAULT 'Aucune description',
-    price       INTEGER NOT NULL,
-    role_id     TEXT,
-    emoji       TEXT DEFAULT '🎁'
-  );
-
-  CREATE TABLE IF NOT EXISTS user_items (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id  TEXT NOT NULL,
-    guild_id TEXT NOT NULL,
-    item_id  INTEGER NOT NULL,
-    quantity INTEGER DEFAULT 1,
-    UNIQUE(user_id, guild_id, item_id),
-    FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS guild_settings (
-    guild_id         TEXT PRIMARY KEY,
-    shop_channel_id  TEXT,
-    shop_message_id  TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS active_duels (
-    id            TEXT PRIMARY KEY,
-    challenger_id TEXT NOT NULL,
-    challenged_id TEXT NOT NULL,
-    guild_id      TEXT NOT NULL,
-    channel_id    TEXT NOT NULL,
-    game          TEXT NOT NULL,
-    bet           INTEGER NOT NULL,
-    data          TEXT DEFAULT '{}',
-    status        TEXT DEFAULT 'pending',
-    created_at    INTEGER DEFAULT (unixepoch())
-  );
-`);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false },
+});
 
 // ─── User helpers ──────────────────────────────────────────────────────────────
 
-export function getUser(userId: string, guildId: string): UserRow {
-  db.prepare('INSERT OR IGNORE INTO users (user_id, guild_id) VALUES (?, ?)').run(userId, guildId);
-  return db.prepare('SELECT * FROM users WHERE user_id = ? AND guild_id = ?').get(userId, guildId) as unknown as UserRow;
+export async function getUser(userId: string, guildId: string): Promise<UserRow> {
+  const { data, error } = await supabase.rpc('ensure_user', { p_user_id: userId, p_guild_id: guildId });
+  if (error) throw new Error(`getUser: ${error.message}`);
+  return (data as UserRow[])[0];
 }
 
-export function addBalance(userId: string, guildId: string, amount: number): void {
-  getUser(userId, guildId);
-  db.prepare('UPDATE users SET balance = balance + ? WHERE user_id = ? AND guild_id = ?').run(amount, userId, guildId);
+export async function addBalance(userId: string, guildId: string, amount: number): Promise<void> {
+  const { error } = await supabase.rpc('increment_balance', { p_user_id: userId, p_guild_id: guildId, p_amount: amount });
+  if (error) throw new Error(`addBalance: ${error.message}`);
 }
 
-export function addWin(userId: string, guildId: string): void {
-  db.prepare('UPDATE users SET wins = wins + 1 WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
+export async function addWin(userId: string, guildId: string): Promise<void> {
+  await supabase.rpc('add_win', { p_user_id: userId, p_guild_id: guildId });
 }
 
-export function addLoss(userId: string, guildId: string): void {
-  db.prepare('UPDATE users SET losses = losses + 1 WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
+export async function addLoss(userId: string, guildId: string): Promise<void> {
+  await supabase.rpc('add_loss', { p_user_id: userId, p_guild_id: guildId });
 }
 
-export function getLeaderboard(guildId: string, limit = 10): UserRow[] {
-  return db.prepare('SELECT * FROM users WHERE guild_id = ? ORDER BY balance DESC LIMIT ?').all(guildId, limit) as unknown as UserRow[];
+export async function setDailyLast(userId: string, guildId: string, timestamp: number): Promise<void> {
+  await supabase.from('users')
+    .update({ daily_last: timestamp })
+    .eq('user_id', userId).eq('guild_id', guildId);
+}
+
+export async function setWorkLast(userId: string, guildId: string, timestamp: number): Promise<void> {
+  await supabase.from('users')
+    .update({ work_last: timestamp })
+    .eq('user_id', userId).eq('guild_id', guildId);
+}
+
+export async function getLeaderboard(guildId: string, limit = 10): Promise<UserRow[]> {
+  const { data } = await supabase
+    .from('users').select('*').eq('guild_id', guildId)
+    .order('balance', { ascending: false }).limit(limit);
+  return (data ?? []) as UserRow[];
 }
 
 // ─── Guild settings ────────────────────────────────────────────────────────────
 
-export function getGuildSettings(guildId: string): GuildSettings | undefined {
-  return db.prepare('SELECT * FROM guild_settings WHERE guild_id = ?').get(guildId) as unknown as GuildSettings | undefined;
+export async function getGuildSettings(guildId: string): Promise<GuildSettings | null> {
+  const { data } = await supabase.from('guild_settings').select('*').eq('guild_id', guildId).maybeSingle();
+  return data as GuildSettings | null;
 }
 
-export function setGuildSettings(guildId: string, channelId: string, messageId: string): void {
-  db.prepare(`
-    INSERT INTO guild_settings (guild_id, shop_channel_id, shop_message_id)
-    VALUES (?, ?, ?)
-    ON CONFLICT(guild_id) DO UPDATE SET shop_channel_id = excluded.shop_channel_id, shop_message_id = excluded.shop_message_id
-  `).run(guildId, channelId, messageId);
+export async function setGuildSettings(guildId: string, channelId: string, messageId: string): Promise<void> {
+  await supabase.from('guild_settings').upsert(
+    { guild_id: guildId, shop_channel_id: channelId, shop_message_id: messageId },
+    { onConflict: 'guild_id' },
+  );
 }
 
 // ─── Shop helpers ──────────────────────────────────────────────────────────────
 
-export function getShopItems(guildId: string): ShopItem[] {
-  return db.prepare('SELECT * FROM shop_items WHERE guild_id = ?').all(guildId) as unknown as ShopItem[];
+export async function getShopItems(guildId: string): Promise<ShopItem[]> {
+  const { data } = await supabase.from('shop_items').select('*').eq('guild_id', guildId).order('id');
+  return (data ?? []) as ShopItem[];
 }
 
-export function getShopItem(id: number, guildId: string): ShopItem | undefined {
-  return db.prepare('SELECT * FROM shop_items WHERE id = ? AND guild_id = ?').get(id, guildId) as unknown as ShopItem | undefined;
+export async function getShopItem(id: number, guildId: string): Promise<ShopItem | null> {
+  const { data } = await supabase.from('shop_items').select('*').eq('id', id).eq('guild_id', guildId).maybeSingle();
+  return data as ShopItem | null;
 }
 
-export function addShopItem(
+export async function addShopItem(
   guildId: string, name: string, description: string,
   price: number, roleId: string | null, emoji: string,
-): { lastInsertRowid: number | bigint } {
-  return db.prepare(
-    'INSERT INTO shop_items (guild_id, name, description, price, role_id, emoji) VALUES (?, ?, ?, ?, ?, ?)',
-  ).run(guildId, name, description, price, roleId ?? null, emoji) as { lastInsertRowid: number | bigint };
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('shop_items')
+    .insert({ guild_id: guildId, name, description, price, role_id: roleId, emoji })
+    .select('id').single();
+  if (error || !data) throw new Error(`addShopItem: ${error?.message}`);
+  return Number(data.id);
 }
 
-export function removeShopItem(id: number, guildId: string): void {
-  db.prepare('DELETE FROM shop_items WHERE id = ? AND guild_id = ?').run(id, guildId);
+export async function removeShopItem(id: number, guildId: string): Promise<void> {
+  await supabase.from('shop_items').delete().eq('id', id).eq('guild_id', guildId);
 }
 
-export function getUserItems(userId: string, guildId: string): (ShopItem & { quantity: number })[] {
-  return db.prepare(`
-    SELECT ui.quantity, si.* FROM user_items ui
-    JOIN shop_items si ON ui.item_id = si.id
-    WHERE ui.user_id = ? AND ui.guild_id = ?
-  `).all(userId, guildId) as unknown as (ShopItem & { quantity: number })[];
+export async function getUserItems(userId: string, guildId: string): Promise<(ShopItem & { quantity: number })[]> {
+  const { data } = await supabase
+    .from('user_items')
+    .select('quantity, shop_items(*)')
+    .eq('user_id', userId)
+    .eq('guild_id', guildId);
+  if (!data) return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return data.map((row: any) => ({ ...row.shop_items, quantity: row.quantity }));
 }
 
-export function addUserItem(userId: string, guildId: string, itemId: number): void {
-  db.prepare(`
-    INSERT INTO user_items (user_id, guild_id, item_id, quantity) VALUES (?, ?, ?, 1)
-    ON CONFLICT(user_id, guild_id, item_id) DO UPDATE SET quantity = quantity + 1
-  `).run(userId, guildId, itemId);
+export async function addUserItem(userId: string, guildId: string, itemId: number): Promise<void> {
+  await supabase.rpc('add_user_item', { p_user_id: userId, p_guild_id: guildId, p_item_id: itemId });
 }
 
 // ─── Duel helpers ──────────────────────────────────────────────────────────────
 
-export function createDuel(
+export async function createDuel(
   id: string, challengerId: string, challengedId: string,
   guildId: string, channelId: string, game: string, bet: number,
-): void {
-  db.prepare(
-    'INSERT INTO active_duels (id, challenger_id, challenged_id, guild_id, channel_id, game, bet) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  ).run(id, challengerId, challengedId, guildId, channelId, game, bet);
+): Promise<void> {
+  await supabase.from('active_duels').insert(
+    { id, challenger_id: challengerId, challenged_id: challengedId, guild_id: guildId, channel_id: channelId, game, bet },
+  );
 }
 
-export function getDuel(id: string): DuelRow | undefined {
-  return db.prepare('SELECT * FROM active_duels WHERE id = ?').get(id) as unknown as DuelRow | undefined;
+export async function getDuel(id: string): Promise<DuelRow | null> {
+  const { data } = await supabase.from('active_duels').select('*').eq('id', id).maybeSingle();
+  return data as DuelRow | null;
 }
 
-export function updateDuelData(id: string, data: Record<string, unknown>): void {
-  db.prepare('UPDATE active_duels SET data = ? WHERE id = ?').run(JSON.stringify(data), id);
+export async function updateDuelData(id: string, data: Record<string, unknown>): Promise<void> {
+  await supabase.from('active_duels').update({ data: JSON.stringify(data) }).eq('id', id);
 }
 
-export function deleteDuel(id: string): void {
-  db.prepare('DELETE FROM active_duels WHERE id = ?').run(id);
+export async function deleteDuel(id: string): Promise<void> {
+  await supabase.from('active_duels').delete().eq('id', id);
 }
 
-export function cleanExpiredDuels(): void {
-  db.prepare("DELETE FROM active_duels WHERE created_at < unixepoch() - 300").run();
+export async function cleanExpiredDuels(): Promise<void> {
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  await supabase.from('active_duels').delete().lt('created_at', fiveMinutesAgo);
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -205,5 +175,5 @@ export interface DuelRow {
   bet: number;
   data: string;
   status: string;
-  created_at: number;
+  created_at: string;
 }

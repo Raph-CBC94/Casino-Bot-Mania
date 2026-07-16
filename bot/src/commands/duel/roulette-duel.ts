@@ -30,14 +30,14 @@ export default {
     if (target.bot || target.id === interaction.user.id)
       return interaction.reply({ content: '❌ Adversaire invalide.', ephemeral: true });
 
-    const challenger = getUser(interaction.user.id, interaction.guildId!);
+    const challenger = await getUser(interaction.user.id, interaction.guildId!);
     if (challenger.balance < bet)
       return interaction.reply({ content: `❌ Solde insuffisant ! Tu as ${formatBalance(challenger.balance)}.`, ephemeral: true });
 
     const duelId = generateDuelId();
-    addBalance(interaction.user.id, interaction.guildId!, -bet);
-    createDuel(duelId, interaction.user.id, target.id, interaction.guildId!, interaction.channelId, 'roulette', bet);
-    updateDuelData(duelId, { challengerColor: color });
+    await addBalance(interaction.user.id, interaction.guildId!, -bet);
+    await createDuel(duelId, interaction.user.id, target.id, interaction.guildId!, interaction.channelId, 'roulette', bet);
+    await updateDuelData(duelId, { challengerColor: color });
 
     const oppositeColor = color === 'rouge' ? 'noir' : 'rouge';
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -63,7 +63,7 @@ export default {
 
   async handleButton(interaction: ButtonInteraction) {
     const [, action, duelId] = interaction.customId.split(':');
-    const duel = getDuel(duelId);
+    const duel = await getDuel(duelId);
 
     if (!duel) return interaction.reply({ content: '⌛ Ce duel a expiré.', ephemeral: true });
     if (interaction.user.id !== duel.challenged_id)
@@ -74,8 +74,8 @@ export default {
     await interaction.deferUpdate();
 
     if (action === 'decline') {
-      addBalance(duel.challenger_id, duel.guild_id, duel.bet);
-      deleteDuel(duelId);
+      await addBalance(duel.challenger_id, duel.guild_id, duel.bet);
+      await deleteDuel(duelId);
       return interaction.editReply({
         embeds: [new EmbedBuilder().setColor(Colors.red).setTitle('🎡 Duel Roulette — Refusé')
           .setDescription(`<@${duel.challenged_id}> a refusé. Mise remboursée.`)],
@@ -83,21 +83,21 @@ export default {
       });
     }
 
-    const challenged = getUser(duel.challenged_id, duel.guild_id);
+    const challenged = await getUser(duel.challenged_id, duel.guild_id);
     if (challenged.balance < duel.bet) {
-      addBalance(duel.challenger_id, duel.guild_id, duel.bet);
-      deleteDuel(duelId);
+      await addBalance(duel.challenger_id, duel.guild_id, duel.bet);
+      await deleteDuel(duelId);
       return interaction.editReply({
         embeds: [new EmbedBuilder().setColor(Colors.red).setDescription(`❌ <@${duel.challenged_id}> n'a pas assez de pièces !`)],
         components: [],
       });
     }
 
-    addBalance(duel.challenged_id, duel.guild_id, -duel.bet);
+    await addBalance(duel.challenged_id, duel.guild_id, -duel.bet);
     const data = JSON.parse(duel.data) as { challengerColor: string };
     const challengerColor = data.challengerColor;
     const challengedColor = challengerColor === 'rouge' ? 'noir' : 'rouge';
-    deleteDuel(duelId);
+    await deleteDuel(duelId);
 
     const spin = randomInt(0, 36);
     const isRed = spin > 0 && RED_NUMBERS.has(spin);
@@ -112,9 +112,9 @@ export default {
       const challengerWon = spinColor === challengerColor;
       const winnerId = challengerWon ? duel.challenger_id : duel.challenged_id;
       const loserId = challengerWon ? duel.challenged_id : duel.challenger_id;
-      addBalance(winnerId, duel.guild_id, duel.bet * 2);
-      addWin(winnerId, duel.guild_id);
-      addLoss(loserId, duel.guild_id);
+      await addBalance(winnerId, duel.guild_id, duel.bet * 2);
+      await addWin(winnerId, duel.guild_id);
+      await addLoss(loserId, duel.guild_id);
 
       embed = new EmbedBuilder()
         .setColor(Colors.gold)

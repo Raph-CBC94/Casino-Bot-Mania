@@ -7,8 +7,8 @@ import { getGuildSettings, getShopItems, setGuildSettings } from '../database/in
 import { Colors } from './colors.js';
 import { formatBalance } from './economy.js';
 
-export function buildShopEmbed(guildId: string) {
-  const items = getShopItems(guildId);
+export async function buildShopEmbed(guildId: string) {
+  const items = await getShopItems(guildId);
   const embed = new EmbedBuilder()
     .setColor(Colors.gold)
     .setTitle('🛒 Boutique du Serveur')
@@ -25,7 +25,7 @@ export function buildShopEmbed(guildId: string) {
   ).join('\n\n');
   embed.setDescription(desc);
 
-  // Build button rows (max 5 per row, max 5 rows = 25 buttons)
+  // Build button rows (max 5 par row, max 5 rows = 25 boutons)
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
   for (let i = 0; i < Math.min(items.length, 25); i++) {
     const rowIdx = Math.floor(i / 5);
@@ -42,7 +42,7 @@ export function buildShopEmbed(guildId: string) {
 }
 
 export async function refreshShopMessage(guildId: string): Promise<void> {
-  const settings = getGuildSettings(guildId);
+  const settings = await getGuildSettings(guildId);
   if (!settings?.shop_channel_id || !settings.shop_message_id) return;
 
   try {
@@ -50,10 +50,10 @@ export async function refreshShopMessage(guildId: string): Promise<void> {
     const channel = await client.channels.fetch(settings.shop_channel_id) as TextChannel | null;
     if (!channel) return;
     const message = await channel.messages.fetch(settings.shop_message_id);
-    const { embed, rows } = buildShopEmbed(guildId);
+    const { embed, rows } = await buildShopEmbed(guildId);
     await message.edit({ embeds: [embed], components: rows });
   } catch {
-    // Message may have been deleted — ignore
+    // Message supprimé — on ignore
   }
 }
 
@@ -62,9 +62,9 @@ export async function postShopMessage(guildId: string, channelId: string): Promi
     const client = getClient();
     const channel = await client.channels.fetch(channelId) as TextChannel | null;
     if (!channel) return null;
-    const { embed, rows } = buildShopEmbed(guildId);
+    const { embed, rows } = await buildShopEmbed(guildId);
     const msg = await channel.send({ embeds: [embed], components: rows });
-    setGuildSettings(guildId, channelId, msg.id);
+    await setGuildSettings(guildId, channelId, msg.id);
     return msg.id;
   } catch {
     return null;

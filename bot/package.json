@@ -10,6 +10,7 @@
     "deploy": "tsx scripts/deploy-commands.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.46.2",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5"
   },

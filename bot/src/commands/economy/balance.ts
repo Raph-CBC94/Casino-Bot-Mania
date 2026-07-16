@@ -11,7 +11,7 @@ export default {
 
   async execute(interaction: ChatInputCommandInteraction) {
     const target = interaction.options.getUser('user') ?? interaction.user;
-    const user = getUser(target.id, interaction.guildId!);
+    const user = await getUser(target.id, interaction.guildId!);
     const ratio = user.wins + user.losses > 0
       ? ((user.wins / (user.wins + user.losses)) * 100).toFixed(1)
       : '0.0';

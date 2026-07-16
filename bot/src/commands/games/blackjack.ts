@@ -77,7 +77,7 @@ async function endGame(
   outcome: 'win' | 'loss' | 'push' | 'blackjack',
 ) {
   games.delete(gameId);
-  const user = getUser(game.userId, game.guildId);
+  const user = await getUser(game.userId, game.guildId);
   let gain = 0;
   let resultText = '';
   let color: number = Colors.blue;
@@ -86,23 +86,23 @@ async function endGame(
     gain = Math.floor(game.bet * 1.5);
     resultText = '🌟 BLACKJACK ! Tu gagnes ×2.5 !';
     color = Colors.gold;
-    addWin(game.userId, game.guildId);
+    await addWin(game.userId, game.guildId);
   } else if (outcome === 'win') {
     gain = game.bet;
     resultText = '✅ Tu gagnes !';
     color = Colors.green;
-    addWin(game.userId, game.guildId);
+    await addWin(game.userId, game.guildId);
   } else if (outcome === 'loss') {
     gain = -game.bet;
     resultText = '❌ Tu perds !';
     color = Colors.red;
-    addLoss(game.userId, game.guildId);
+    await addLoss(game.userId, game.guildId);
   } else {
     resultText = '🤝 Égalité — mise remboursée';
     color = Colors.blue;
   }
 
-  addBalance(game.userId, game.guildId, gain);
+  await addBalance(game.userId, game.guildId, gain);
   const newBalance = user.balance + gain;
 
   const embed = buildEmbed(game, false)
@@ -130,7 +130,7 @@ export default {
 
   async execute(interaction: ChatInputCommandInteraction) {
     const bet = interaction.options.getInteger('mise', true);
-    const user = getUser(interaction.user.id, interaction.guildId!);
+    const user = await getUser(interaction.user.id, interaction.guildId!);
     const gameId = `${interaction.user.id}:${interaction.guildId}`;
 
     if (games.has(gameId)) {
@@ -143,7 +143,7 @@ export default {
       });
     }
 
-    addBalance(interaction.user.id, interaction.guildId!, -bet);
+    await addBalance(interaction.user.id, interaction.guildId!, -bet);
 
     const player = [drawCard(), drawCard()];
     const dealer = [drawCard(), drawCard()];
@@ -152,19 +152,19 @@ export default {
 
     // Blackjack immédiat
     if (handValue(player) === 21) {
-      addBalance(interaction.user.id, interaction.guildId!, bet); // refund
+      await addBalance(interaction.user.id, interaction.guildId!, bet); // refund
       return endGame(interaction, game, gameId, 'blackjack');
     }
 
     const embed = buildEmbed(game);
-    const row = buildButtons(gameId, user.balance >= bet);
+    const row = buildButtons(gameId, user.balance - bet >= bet);
     await interaction.reply({ embeds: [embed], components: [row] });
 
     // Auto-clean après 5 min
-    setTimeout(() => {
+    setTimeout(async () => {
       if (games.has(gameId)) {
         games.delete(gameId);
-        addLoss(interaction.user.id, interaction.guildId!);
+        await addLoss(interaction.user.id, interaction.guildId!);
       }
     }, 300_000);
   },
@@ -184,12 +184,12 @@ export default {
 
     if (action === 'hit' || action === 'double') {
       if (action === 'double') {
-        const balance = getUser(game.userId, game.guildId).balance;
-        if (balance < game.bet) {
+        const currentUser = await getUser(game.userId, game.guildId);
+        if (currentUser.balance < game.bet) {
           await interaction.followUp({ content: '❌ Solde insuffisant pour doubler !', ephemeral: true });
           return;
         }
-        addBalance(game.userId, game.guildId, -game.bet);
+        await addBalance(game.userId, game.guildId, -game.bet);
         game.bet *= 2;
         game.doubled = true;
       }
@@ -199,7 +199,6 @@ export default {
 
       if (pv > 21) return endGame(interaction, game, gameId, 'loss');
       if (pv === 21 || game.doubled) {
-        // Stand forced after double, or player hit 21
         return handleStand(interaction, game, gameId);
       }
 
@@ -217,7 +216,6 @@ async function handleStand(
   game: BJGame,
   gameId: string,
 ) {
-  // Dealer plays
   while (handValue(game.dealer) < 17) game.dealer.push(drawCard());
 
   const pv = handValue(game.player);

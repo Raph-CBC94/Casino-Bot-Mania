@@ -18,8 +18,8 @@ export default {
     const target = interaction.options.getUser('joueur', true);
     const amount = interaction.options.getInteger('montant', true);
 
-    addBalance(target.id, interaction.guildId!, amount);
-    const user = getUser(target.id, interaction.guildId!);
+    await addBalance(target.id, interaction.guildId!, amount);
+    const user = await getUser(target.id, interaction.guildId!);
 
     const embed = new EmbedBuilder()
       .setColor(Colors.green)

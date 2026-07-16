@@ -7,7 +7,7 @@ export default {
     .setDescription('🛒 Affiche la boutique du serveur'),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const { embed, rows } = buildShopEmbed(interaction.guildId!);
+    const { embed, rows } = await buildShopEmbed(interaction.guildId!);
     await interaction.reply({ embeds: [embed], components: rows, ephemeral: false });
   },
 };

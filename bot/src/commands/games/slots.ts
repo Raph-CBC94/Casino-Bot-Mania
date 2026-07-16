@@ -1,8 +1,4 @@
-import {
-  ChatInputCommandInteraction,
-  EmbedBuilder,
-  SlashCommandBuilder,
-} from 'discord.js';
+import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { getUser, addBalance, addWin, addLoss } from '../../database/index.js';
 import { Colors } from '../../utils/colors.js';
 import { formatBalance } from '../../utils/economy.js';
@@ -28,7 +24,7 @@ function spinReel(): string[] {
   return [weightedRandom(), weightedRandom(), weightedRandom()];
 }
 
-function computePayout(reel: string[], bet: number): { multiplier: number; label: string } {
+function computePayout(reel: string[]): { multiplier: number; label: string } {
   const [a, b, c] = reel;
   if (a === b && b === c) {
     const m = PAYOUTS[a] ?? 3;
@@ -49,7 +45,7 @@ export default {
 
   async execute(interaction: ChatInputCommandInteraction) {
     const bet = interaction.options.getInteger('mise', true);
-    const user = getUser(interaction.user.id, interaction.guildId!);
+    const user = await getUser(interaction.user.id, interaction.guildId!);
     if (user.balance < bet) {
       return interaction.reply({
         embeds: [new EmbedBuilder().setColor(Colors.red).setDescription(`❌ Solde insuffisant ! Tu as ${formatBalance(user.balance)} mais tu misais ${formatBalance(bet)}.`)],
@@ -58,12 +54,12 @@ export default {
     }
 
     const reel = spinReel();
-    const { multiplier, label } = computePayout(reel, bet);
+    const { multiplier, label } = computePayout(reel);
     const gain = Math.floor(bet * multiplier) - bet;
 
-    addBalance(interaction.user.id, interaction.guildId!, gain);
-    if (gain >= 0) addWin(interaction.user.id, interaction.guildId!);
-    else addLoss(interaction.user.id, interaction.guildId!);
+    await addBalance(interaction.user.id, interaction.guildId!, gain);
+    if (gain >= 0) await addWin(interaction.user.id, interaction.guildId!);
+    else await addLoss(interaction.user.id, interaction.guildId!);
 
     const newBalance = user.balance + gain;
     const won = gain > 0;
