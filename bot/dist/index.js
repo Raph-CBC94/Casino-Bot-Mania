@@ -1,7 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.commands = exports.client = void 0;
-require("dotenv/config");
+// Charge .env en développement local uniquement (Render injecte les vars directement)
+if (process.env.NODE_ENV !== 'production') {
+    try {
+        require('dotenv/config');
+    }
+    catch { }
+}
 const discord_js_1 = require("discord.js");
 const index_js_1 = require("./database/index.js");
 const index_js_2 = require("./commands/index.js");

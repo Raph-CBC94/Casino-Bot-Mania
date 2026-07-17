@@ -1,4 +1,7 @@
-import 'dotenv/config';
+// Charge .env en développement local uniquement (Render injecte les vars directement)
+if (process.env.NODE_ENV !== 'production') {
+  try { require('dotenv/config'); } catch {}
+}
 import { Client, Collection, Events, GatewayIntentBits, Partials } from 'discord.js';
 import { cleanExpiredDuels } from './database/index.js';
 import { loadCommands } from './commands/index.js';
