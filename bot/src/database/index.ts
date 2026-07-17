@@ -33,15 +33,11 @@ export async function addLoss(userId: string, guildId: string): Promise<void> {
 }
 
 export async function setDailyLast(userId: string, guildId: string, timestamp: number): Promise<void> {
-  await supabase.from('users')
-    .update({ daily_last: timestamp })
-    .eq('user_id', userId).eq('guild_id', guildId);
+  await supabase.from('users').update({ daily_last: timestamp }).eq('user_id', userId).eq('guild_id', guildId);
 }
 
 export async function setWorkLast(userId: string, guildId: string, timestamp: number): Promise<void> {
-  await supabase.from('users')
-    .update({ work_last: timestamp })
-    .eq('user_id', userId).eq('guild_id', guildId);
+  await supabase.from('users').update({ work_last: timestamp }).eq('user_id', userId).eq('guild_id', guildId);
 }
 
 export async function getLeaderboard(guildId: string, limit = 10): Promise<UserRow[]> {
@@ -49,6 +45,38 @@ export async function getLeaderboard(guildId: string, limit = 10): Promise<UserR
     .from('users').select('*').eq('guild_id', guildId)
     .order('balance', { ascending: false }).limit(limit);
   return (data ?? []) as UserRow[];
+}
+
+// ─── Active effects ────────────────────────────────────────────────────────────
+
+export async function getActiveEffect(userId: string, guildId: string, effectType: string): Promise<ActiveEffect | null> {
+  const now = new Date().toISOString();
+  const { data } = await supabase
+    .from('active_effects').select('*')
+    .eq('user_id', userId).eq('guild_id', guildId).eq('effect_type', effectType)
+    .gt('expires_at', now)
+    .order('expires_at', { ascending: false })
+    .limit(1).maybeSingle();
+  return data as ActiveEffect | null;
+}
+
+export async function addEffect(userId: string, guildId: string, effectType: string, value: number, durationSec: number): Promise<void> {
+  const expiresAt = new Date(Date.now() + durationSec * 1000).toISOString();
+  // Replace existing effect of same type
+  await supabase.from('active_effects').delete().eq('user_id', userId).eq('guild_id', guildId).eq('effect_type', effectType);
+  await supabase.from('active_effects').insert({ user_id: userId, guild_id: guildId, effect_type: effectType, value, expires_at: expiresAt });
+}
+
+export async function consumeEffect(userId: string, guildId: string, effectType: string): Promise<void> {
+  await supabase.from('active_effects').delete().eq('user_id', userId).eq('guild_id', guildId).eq('effect_type', effectType);
+}
+
+export async function getUserActiveEffects(userId: string, guildId: string): Promise<ActiveEffect[]> {
+  const now = new Date().toISOString();
+  const { data } = await supabase
+    .from('active_effects').select('*')
+    .eq('user_id', userId).eq('guild_id', guildId).gt('expires_at', now);
+  return (data ?? []) as ActiveEffect[];
 }
 
 // ─── Guild settings ────────────────────────────────────────────────────────────
@@ -65,10 +93,25 @@ export async function setGuildSettings(guildId: string, channelId: string, messa
   );
 }
 
+export async function setLeaderboardMessage(guildId: string, channelId: string, messageId: string): Promise<void> {
+  await supabase.from('guild_settings').upsert(
+    { guild_id: guildId, leaderboard_channel_id: channelId, leaderboard_message_id: messageId },
+    { onConflict: 'guild_id' },
+  );
+}
+
+export async function getAllLeaderboardConfigs(): Promise<GuildSettings[]> {
+  const { data } = await supabase
+    .from('guild_settings').select('*')
+    .not('leaderboard_channel_id', 'is', null)
+    .not('leaderboard_message_id', 'is', null);
+  return (data ?? []) as GuildSettings[];
+}
+
 // ─── Shop helpers ──────────────────────────────────────────────────────────────
 
 export async function getShopItems(guildId: string): Promise<ShopItem[]> {
-  const { data } = await supabase.from('shop_items').select('*').eq('guild_id', guildId).order('id');
+  const { data } = await supabase.from('shop_items').select('*').eq('guild_id', guildId).order('price');
   return (data ?? []) as ShopItem[];
 }
 
@@ -80,10 +123,11 @@ export async function getShopItem(id: number, guildId: string): Promise<ShopItem
 export async function addShopItem(
   guildId: string, name: string, description: string,
   price: number, roleId: string | null, emoji: string,
+  effectType: string | null = null, effectValue = 1, effectDuration = 86400,
 ): Promise<number> {
   const { data, error } = await supabase
     .from('shop_items')
-    .insert({ guild_id: guildId, name, description, price, role_id: roleId, emoji })
+    .insert({ guild_id: guildId, name, description, price, role_id: roleId, emoji, effect_type: effectType, effect_value: effectValue, effect_duration: effectDuration })
     .select('id').single();
   if (error || !data) throw new Error(`addShopItem: ${error?.message}`);
   return Number(data.id);
@@ -95,10 +139,8 @@ export async function removeShopItem(id: number, guildId: string): Promise<void>
 
 export async function getUserItems(userId: string, guildId: string): Promise<(ShopItem & { quantity: number })[]> {
   const { data } = await supabase
-    .from('user_items')
-    .select('quantity, shop_items(*)')
-    .eq('user_id', userId)
-    .eq('guild_id', guildId);
+    .from('user_items').select('quantity, shop_items(*)')
+    .eq('user_id', userId).eq('guild_id', guildId);
   if (!data) return [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return data.map((row: any) => ({ ...row.shop_items, quantity: row.quantity }));
@@ -157,12 +199,26 @@ export interface ShopItem {
   price: number;
   role_id: string | null;
   emoji: string;
+  effect_type: string | null;
+  effect_value: number;
+  effect_duration: number;
+}
+
+export interface ActiveEffect {
+  id: number;
+  user_id: string;
+  guild_id: string;
+  effect_type: string;
+  value: number;
+  expires_at: string;
 }
 
 export interface GuildSettings {
   guild_id: string;
   shop_channel_id: string | null;
   shop_message_id: string | null;
+  leaderboard_channel_id: string | null;
+  leaderboard_message_id: string | null;
 }
 
 export interface DuelRow {
