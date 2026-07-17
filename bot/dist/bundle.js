@@ -1460,9 +1460,9 @@ var require_util = __commonJS({
       }
       return url;
     }
-    function isValidPort(port) {
-      const value = parseInt(port, 10);
-      return value === Number(port) && value >= 0 && value <= 65535;
+    function isValidPort(port2) {
+      const value = parseInt(port2, 10);
+      return value === Number(port2) && value >= 0 && value <= 65535;
     }
     function isHttpOrHttpsPrefixed(value) {
       return value != null && value[0] === "h" && value[1] === "t" && value[2] === "t" && value[3] === "p" && (value[4] === ":" || value[4] === "s" && value[5] === ":");
@@ -1497,8 +1497,8 @@ var require_util = __commonJS({
         if (!isHttpOrHttpsPrefixed(url.origin || url.protocol)) {
           throw new InvalidArgumentError("Invalid URL protocol: the URL must start with `http:` or `https:`.");
         }
-        const port = url.port != null ? url.port : url.protocol === "https:" ? 443 : 80;
-        let origin = url.origin != null ? url.origin : `${url.protocol || ""}//${url.hostname || ""}:${port}`;
+        const port2 = url.port != null ? url.port : url.protocol === "https:" ? 443 : 80;
+        let origin = url.origin != null ? url.origin : `${url.protocol || ""}//${url.hostname || ""}:${port2}`;
         let path = url.path != null ? url.path : `${url.pathname || ""}${url.search || ""}`;
         if (origin[origin.length - 1] === "/") {
           origin = origin.slice(0, origin.length - 1);
@@ -1922,34 +1922,34 @@ var require_diagnostics = __commonJS({
       const debuglog = fetchDebuglog.enabled ? fetchDebuglog : undiciDebugLog;
       diagnosticsChannel.channel("undici:client:beforeConnect").subscribe((evt) => {
         const {
-          connectParams: { version: version3, protocol, port, host }
+          connectParams: { version: version3, protocol, port: port2, host }
         } = evt;
         debuglog(
           "connecting to %s using %s%s",
-          `${host}${port ? `:${port}` : ""}`,
+          `${host}${port2 ? `:${port2}` : ""}`,
           protocol,
           version3
         );
       });
       diagnosticsChannel.channel("undici:client:connected").subscribe((evt) => {
         const {
-          connectParams: { version: version3, protocol, port, host }
+          connectParams: { version: version3, protocol, port: port2, host }
         } = evt;
         debuglog(
           "connected to %s using %s%s",
-          `${host}${port ? `:${port}` : ""}`,
+          `${host}${port2 ? `:${port2}` : ""}`,
           protocol,
           version3
         );
       });
       diagnosticsChannel.channel("undici:client:connectError").subscribe((evt) => {
         const {
-          connectParams: { version: version3, protocol, port, host },
+          connectParams: { version: version3, protocol, port: port2, host },
           error
         } = evt;
         debuglog(
           "connection to %s using %s%s errored - %s",
-          `${host}${port ? `:${port}` : ""}`,
+          `${host}${port2 ? `:${port2}` : ""}`,
           protocol,
           version3,
           error.message
@@ -2000,37 +2000,37 @@ var require_diagnostics = __commonJS({
         const debuglog = undiciDebugLog.enabled ? undiciDebugLog : websocketDebuglog;
         diagnosticsChannel.channel("undici:client:beforeConnect").subscribe((evt) => {
           const {
-            connectParams: { version: version3, protocol, port, host }
+            connectParams: { version: version3, protocol, port: port2, host }
           } = evt;
           debuglog(
             "connecting to %s%s using %s%s",
             host,
-            port ? `:${port}` : "",
+            port2 ? `:${port2}` : "",
             protocol,
             version3
           );
         });
         diagnosticsChannel.channel("undici:client:connected").subscribe((evt) => {
           const {
-            connectParams: { version: version3, protocol, port, host }
+            connectParams: { version: version3, protocol, port: port2, host }
           } = evt;
           debuglog(
             "connected to %s%s using %s%s",
             host,
-            port ? `:${port}` : "",
+            port2 ? `:${port2}` : "",
             protocol,
             version3
           );
         });
         diagnosticsChannel.channel("undici:client:connectError").subscribe((evt) => {
           const {
-            connectParams: { version: version3, protocol, port, host },
+            connectParams: { version: version3, protocol, port: port2, host },
             error
           } = evt;
           debuglog(
             "connection to %s%s using %s%s errored - %s",
             host,
-            port ? `:${port}` : "",
+            port2 ? `:${port2}` : "",
             protocol,
             version3,
             error.message
@@ -2045,9 +2045,9 @@ var require_diagnostics = __commonJS({
       }
       diagnosticsChannel.channel("undici:websocket:open").subscribe((evt) => {
         const {
-          address: { address, port }
+          address: { address, port: port2 }
         } = evt;
-        websocketDebuglog("connection opened %s%s", address, port ? `:${port}` : "");
+        websocketDebuglog("connection opened %s%s", address, port2 ? `:${port2}` : "");
       });
       diagnosticsChannel.channel("undici:websocket:close").subscribe((evt) => {
         const { websocket, code, reason } = evt;
@@ -2931,7 +2931,7 @@ var require_connect = __commonJS({
       const sessionCache = new SessionCache(maxCachedSessions == null ? 100 : maxCachedSessions);
       timeout = timeout == null ? 1e4 : timeout;
       allowH2 = allowH2 != null ? allowH2 : false;
-      return function connect({ hostname, host, protocol, port, servername, localAddress, httpSocket }, callback) {
+      return function connect({ hostname, host, protocol, port: port2, servername, localAddress, httpSocket }, callback) {
         let socket;
         if (protocol === "https:") {
           if (!tls) {
@@ -2941,7 +2941,7 @@ var require_connect = __commonJS({
           const sessionKey = servername || hostname;
           assert(sessionKey);
           const session = customSession || sessionCache.get(sessionKey) || null;
-          port = port || 443;
+          port2 = port2 || 443;
           socket = tls.connect({
             highWaterMark: 16384,
             // TLS in node can't have bigger HWM anyway...
@@ -2953,7 +2953,7 @@ var require_connect = __commonJS({
             ALPNProtocols: allowH2 ? ["http/1.1", "h2"] : ["http/1.1"],
             socket: httpSocket,
             // upgrade socket connection
-            port,
+            port: port2,
             host: hostname
           });
           socket.on("session", function(session2) {
@@ -2961,13 +2961,13 @@ var require_connect = __commonJS({
           });
         } else {
           assert(!httpSocket, "httpSocket can only be sent on TLS update");
-          port = port || 80;
+          port2 = port2 || 80;
           socket = net.connect({
             highWaterMark: 64 * 1024,
             // Same as nodejs fs streams.
             ...options,
             localAddress,
-            port,
+            port: port2,
             host: hostname
           });
         }
@@ -2975,7 +2975,7 @@ var require_connect = __commonJS({
           const keepAliveInitialDelay = options.keepAliveInitialDelay === void 0 ? 6e4 : options.keepAliveInitialDelay;
           socket.setKeepAlive(true, keepAliveInitialDelay);
         }
-        const clearConnectTimeout = setupConnectTimeout(new WeakRef(socket), { timeout, hostname, port });
+        const clearConnectTimeout = setupConnectTimeout(new WeakRef(socket), { timeout, hostname, port: port2 });
         socket.setNoDelay(true).once(protocol === "https:" ? "secureConnect" : "connect", function() {
           queueMicrotask(clearConnectTimeout);
           if (callback) {
@@ -7426,8 +7426,8 @@ var require_client_h2 = __commonJS({
         }
       }
       let stream;
-      const { hostname, port } = client2[kUrl];
-      headers[HTTP2_HEADER_AUTHORITY] = host || `${hostname}${port ? `:${port}` : ""}`;
+      const { hostname, port: port2 } = client2[kUrl];
+      headers[HTTP2_HEADER_AUTHORITY] = host || `${hostname}${port2 ? `:${port2}` : ""}`;
       headers[HTTP2_HEADER_METHOD] = method;
       const abort = (err) => {
         if (request.aborted || request.completed) {
@@ -8236,7 +8236,7 @@ var require_client = __commonJS({
     async function connect(client2) {
       assert(!client2[kConnecting]);
       assert(!client2[kHTTPContext]);
-      let { host, hostname, protocol, port } = client2[kUrl];
+      let { host, hostname, protocol, port: port2 } = client2[kUrl];
       if (hostname[0] === "[") {
         const idx = hostname.indexOf("]");
         assert(idx !== -1);
@@ -8251,7 +8251,7 @@ var require_client = __commonJS({
             host,
             hostname,
             protocol,
-            port,
+            port: port2,
             version: client2[kHTTPContext]?.version,
             servername: client2[kServerName],
             localAddress: client2[kLocalAddress]
@@ -8265,7 +8265,7 @@ var require_client = __commonJS({
             host,
             hostname,
             protocol,
-            port,
+            port: port2,
             servername: client2[kServerName],
             localAddress: client2[kLocalAddress]
           }, (err, socket2) => {
@@ -8298,7 +8298,7 @@ var require_client = __commonJS({
               host,
               hostname,
               protocol,
-              port,
+              port: port2,
               version: client2[kHTTPContext]?.version,
               servername: client2[kServerName],
               localAddress: client2[kLocalAddress]
@@ -8319,7 +8319,7 @@ var require_client = __commonJS({
               host,
               hostname,
               protocol,
-              port,
+              port: port2,
               version: client2[kHTTPContext]?.version,
               servername: client2[kServerName],
               localAddress: client2[kLocalAddress]
@@ -9090,7 +9090,7 @@ var require_proxy_agent = __commonJS({
         }
         const { proxyTunnel = true } = opts;
         const url = this.#getUrl(opts);
-        const { href, origin, port, protocol, username, password, hostname: proxyHostname } = url;
+        const { href, origin, port: port2, protocol, username, password, hostname: proxyHostname } = url;
         this[kProxy] = { uri: href, protocol };
         this[kInterceptors] = opts.interceptors?.ProxyAgent && Array.isArray(opts.interceptors.ProxyAgent) ? opts.interceptors.ProxyAgent : [];
         this[kRequestTls] = opts.requestTls;
@@ -9132,7 +9132,7 @@ var require_proxy_agent = __commonJS({
             try {
               const { socket, statusCode } = await this[kClient].connect({
                 origin,
-                port,
+                port: port2,
                 path: requestedPath,
                 signal: opts2.signal,
                 headers: {
@@ -9289,10 +9289,10 @@ var require_env_http_proxy_agent = __commonJS({
         }
       }
       #getProxyAgentForUrl(url) {
-        let { protocol, host: hostname, port } = url;
+        let { protocol, host: hostname, port: port2 } = url;
         hostname = hostname.replace(/:\d*$/, "").toLowerCase();
-        port = Number.parseInt(port, 10) || DEFAULT_PORTS[protocol] || 0;
-        if (!this.#shouldProxy(hostname, port)) {
+        port2 = Number.parseInt(port2, 10) || DEFAULT_PORTS[protocol] || 0;
+        if (!this.#shouldProxy(hostname, port2)) {
           return this[kNoProxyAgent];
         }
         if (protocol === "https:") {
@@ -9300,7 +9300,7 @@ var require_env_http_proxy_agent = __commonJS({
         }
         return this[kHttpProxyAgent];
       }
-      #shouldProxy(hostname, port) {
+      #shouldProxy(hostname, port2) {
         if (this.#noProxyChanged) {
           this.#parseNoProxy();
         }
@@ -9312,7 +9312,7 @@ var require_env_http_proxy_agent = __commonJS({
         }
         for (let i = 0; i < this.#noProxyEntries.length; i++) {
           const entry = this.#noProxyEntries[i];
-          if (entry.port && entry.port !== port) {
+          if (entry.port && entry.port !== port2) {
             continue;
           }
           if (!/^[.*]/.test(entry.hostname)) {
@@ -11944,17 +11944,17 @@ var require_dns = __commonJS({
               records,
               newOpts.affinity
             );
-            let port;
+            let port2;
             if (typeof ip.port === "number") {
-              port = `:${ip.port}`;
+              port2 = `:${ip.port}`;
             } else if (origin.port !== "") {
-              port = `:${origin.port}`;
+              port2 = `:${origin.port}`;
             } else {
-              port = "";
+              port2 = "";
             }
             cb(
               null,
-              `${origin.protocol}//${ip.family === 6 ? `[${ip.address}]` : ip.address}${port}`
+              `${origin.protocol}//${ip.family === 6 ? `[${ip.address}]` : ip.address}${port2}`
             );
           });
         } else {
@@ -11968,17 +11968,17 @@ var require_dns = __commonJS({
             this.runLookup(origin, opts, cb);
             return;
           }
-          let port;
+          let port2;
           if (typeof ip.port === "number") {
-            port = `:${ip.port}`;
+            port2 = `:${ip.port}`;
           } else if (origin.port !== "") {
-            port = `:${origin.port}`;
+            port2 = `:${origin.port}`;
           } else {
-            port = "";
+            port2 = "";
           }
           cb(
             null,
-            `${origin.protocol}//${ip.family === 6 ? `[${ip.address}]` : ip.address}${port}`
+            `${origin.protocol}//${ip.family === 6 ? `[${ip.address}]` : ip.address}${port2}`
           );
         }
       }
@@ -28046,7 +28046,7 @@ var require_dist5 = __commonJS({
       return defaultStrategy;
     }
     __name(getDefaultStrategy, "getDefaultStrategy");
-    var import_node_http = require("http");
+    var import_node_http2 = require("http");
     var import_node_url = require("url");
     var import_node_util = require("util");
     var import_undici = require_undici();
@@ -28072,7 +28072,7 @@ var require_dist5 = __commonJS({
         },
         headers: new import_undici.Headers(res.headers),
         status: res.statusCode,
-        statusText: import_node_http.STATUS_CODES[res.statusCode],
+        statusText: import_node_http2.STATUS_CODES[res.statusCode],
         ok: res.statusCode >= 200 && res.statusCode < 300
       };
     }
@@ -98330,6 +98330,7 @@ async function handleInteraction(interaction) {
 }
 
 // src/index.ts
+var import_node_http = require("node:http");
 if (process.env.NODE_ENV !== "production") {
   try {
     require_config();
@@ -98353,6 +98354,13 @@ client.once(import_discord22.Events.ClientReady, (c) => {
 });
 client.on(import_discord22.Events.InteractionCreate, handleInteraction);
 client.login(token);
+var port = process.env.PORT || 3e3;
+(0, import_node_http.createServer)((_, res) => {
+  res.writeHead(200);
+  res.end("Bot en ligne");
+}).listen(port, () => {
+  console.log(`\u{1F310} Serveur HTTP en \xE9coute sur le port ${port}`);
+});
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   client,

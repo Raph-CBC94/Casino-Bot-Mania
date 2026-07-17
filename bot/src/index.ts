@@ -32,6 +32,13 @@ client.on(Events.InteractionCreate, handleInteraction);
 
 client.login(token);
 
+// Serveur HTTP minimal requis par Render (Web Service)
+import { createServer } from 'node:http';
+const port = process.env.PORT || 3000;
+createServer((_, res) => { res.writeHead(200); res.end('Bot en ligne'); }).listen(port, () => {
+  console.log(`🌐 Serveur HTTP en écoute sur le port ${port}`);
+});
+
 export interface Command {
   data: { name: string; toJSON: () => unknown };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
