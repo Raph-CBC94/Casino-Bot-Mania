@@ -98341,11 +98341,8 @@ if (!token) throw new Error("\u274C  DISCORD_TOKEN manquant dans les variables d
 var client = new import_discord22.Client({
   intents: [
     import_discord22.GatewayIntentBits.Guilds,
-    import_discord22.GatewayIntentBits.GuildMessages,
-    import_discord22.GatewayIntentBits.GuildMembers,
-    import_discord22.GatewayIntentBits.DirectMessages
-  ],
-  partials: [import_discord22.Partials.Channel]
+    import_discord22.GatewayIntentBits.GuildMessages
+  ]
 });
 setClient(client);
 var commands = new import_discord22.Collection();
